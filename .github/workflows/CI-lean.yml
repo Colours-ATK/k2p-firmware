@@ -27,7 +27,7 @@ jobs:
       - name: Prepare environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y libtool-bin gperf python-docutils autopoint gettext fakeroot p7zip-full
+          sudo apt-get install -y libtool-bin gperf python3-docutils autopoint gettext fakeroot p7zip-full
 
       - name: Prepare toolchain
         run: |
