@@ -1,0 +1,56 @@
+name: CI-K2P-perf
+
+# K2P Padavan 定制构建: 克隆 padavanonly 上游源码 + 注入 K2P_perf 模板
+# push 改动模板或此 workflow、或手动触发
+on:
+  push:
+    paths:
+      - 'trunk/configs/templates/K2P_perf.config'
+      - '.github/workflows/CI-lean.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: build-k2p-perf
+    runs-on: ubuntu-22.04
+    env:
+      images_dir: /opt/images
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone upstream source
+        run: git clone --depth 1 https://github.com/padavanonly/rt-n56u.git padavan
+
+      - name: Inject K2P_perf template
+        run: cp -f trunk/configs/templates/K2P_perf.config padavan/trunk/configs/templates/
+
+      - name: Prepare environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libtool-bin gperf python-docutils autopoint gettext fakeroot p7zip-full
+
+      - name: Prepare toolchain
+        run: |
+          cd padavan/toolchain-mipsel
+          sh dl_toolchain.sh
+
+      - name: Start build
+        run: |
+          cd padavan/trunk
+          mkdir -p ${images_dir}
+          fakeroot ./build_firmware_ci K2P_perf
+          if [ $? = 0 ]; then cp -f images/*.trx ${images_dir}/K2P_perf.trx; else exit 1; fi
+
+      - name: Create archive
+        run: |
+          ls -lh ${images_dir}
+          GIT_VERSION=`git -C padavan rev-parse --short=7 HEAD 2>/dev/null`
+          image_name=K2P_perf_${GIT_VERSION:-manual}
+          cd ${images_dir}; md5sum *.trx | tee md5sum.txt; 7z a -mx=9 ${image_name}.7z ./*
+          echo "image_name=${image_name}" >> $GITHUB_ENV
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${env.image_name}
+          path: ${env.images_dir}/*
